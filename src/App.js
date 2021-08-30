@@ -110,7 +110,7 @@ function App() {
 
   useEffect(() => {
     getRawPrice(fromAddress, toAddress).then(p =>
-      setRawPrice((parseInt(p.toString()) / 10 ** 18))
+      setRawPrice(parseInt(p.toString()) / 10 ** 18)
     );
   }, [fromAddress, toAddress]);
 
@@ -223,12 +223,14 @@ function App() {
                 </Center>
                 <Center p="4">
                   <Stat>
-                    <StatLabel>Price ({toTokenName}/{fromTokenName}):</StatLabel>
+                    <StatLabel>
+                      Price ({toTokenName}/{fromTokenName}):
+                    </StatLabel>
                     <StatNumber fontSize="sm">{rawPrice}</StatNumber>
                   </Stat>
                 </Center>
                 <Center p="4">
-                <Stat>
+                  <Stat>
                     <StatLabel>You get ({toTokenName}):</StatLabel>
                     <StatNumber fontSize="sm">{exchangePrice}</StatNumber>
                   </Stat>
