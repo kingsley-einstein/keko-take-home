@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import "./App.css";
-import React, { useContext, useState, useEffect } from "react";
+import React, { useContext, useState, useEffect, useRef } from "react";
 import {
   VStack,
   Container,
@@ -19,9 +19,14 @@ import {
   InputRightAddon,
   Stat,
   StatLabel,
-  StatNumber
+  StatNumber,
+  AlertDialog,
+  AlertDialogBody,
+  AlertDialogOverlay,
+  AlertDialogContent,
+  AlertDialogFooter
 } from "@chakra-ui/react";
-import { ArrowUpDownIcon, ArrowForwardIcon } from "@chakra-ui/icons";
+import { ArrowUpDownIcon, ArrowForwardIcon, CloseIcon } from "@chakra-ui/icons";
 import { USDAddress, ETHAddress } from "./constants";
 import "./index.css";
 import { Web3Context } from "./web3";
@@ -39,7 +44,9 @@ function App() {
     handleEthInputChange,
     ethForSimEth,
     swapTokens,
-    getRawPrice
+    getRawPrice,
+    web3_connected,
+    mintSimUSD
   } = useContext(Web3Context);
 
   const [fromTokenName, setFromTokenName] = useState("SimETH");
@@ -52,7 +59,12 @@ function App() {
   const [fromAddress, setFromAddress] = useState(ETHAddress);
   const [toAddress, setToAddress] = useState(USDAddress);
   const [rawPrice, setRawPrice] = useState(0);
-  const [exchangePrice, setExchangePrice] = useState(0);
+  const [eth2SimEth, setEth2SimEth] = useState(ethForSimEth);
+  const [mintLoading, setMintLoading] = useState(false);
+  const [alertColorScheme, setAlertColorScheme] = useState("green");
+  const [dialogShown, setDialogShown] = useState(false);
+  const [dialogMessage, setDialogMessage] = useState("");
+  const cancelRef = useRef();
 
   const switchTokens = () => {
     const fTokenName = fromTokenName;
@@ -86,6 +98,10 @@ function App() {
     setToValue(toTokenBalance);
   };
 
+  const setMaxETHToSimETH = () => {
+    setEth2SimEth(eth_balance);
+  };
+
   const handleFromChange = e => {
     setFromValue(e.target.value);
   };
@@ -96,6 +112,28 @@ function App() {
 
   const swap = async () => {
     await swapTokens(fromAddress, toAddress, fromValue, toValue);
+  };
+
+  const getSimUSD = async () => {
+    try {
+      setMintLoading(true);
+      await mintSimUSD();
+      setDialogMessage("Successfully minted some SimUSD");
+      setAlertColorScheme("green");
+      setDialogShown(true);
+      setMintLoading(false);
+    } catch (error) {
+      setDialogMessage(error.message);
+      setAlertColorScheme("red");
+      setDialogShown(true);
+      setMintLoading(false);
+    }
+  };
+
+  const closeAlertIfOpen = () => {
+    setDialogShown(false);
+    setAlertColorScheme("green");
+    setDialogMessage("");
   };
 
   useEffect(() => {
@@ -109,19 +147,39 @@ function App() {
   }, [sim_eth_balance, sim_usd_balance]);
 
   useEffect(() => {
-    getRawPrice(fromAddress, toAddress).then(p =>
-      setRawPrice(parseInt(p.toString()) / 10 ** 18)
-    );
-  }, [fromAddress, toAddress]);
-
-  useEffect(() => {
-    setExchangePrice(fromValue / rawPrice);
-  }, [rawPrice, fromValue]);
+    setTimeout(() => {
+      if (web3_connected) {
+        getRawPrice(ETHAddress, USDAddress).then(p =>
+          setRawPrice(parseInt(p.toString()) / 10 ** 18)
+        );
+      }
+    }, 500);
+  }, [web3_connected]);
 
   return (
     <div>
       <Container maxW="container.xl" bg="ghostwhite" margin="0.5" padding={3}>
         <div>
+          <AlertDialog
+            isOpen={dialogShown}
+            onClose={closeAlertIfOpen}
+            leastDestructiveRef={cancelRef}
+            colorScheme={alertColorScheme}
+          >
+            <AlertDialogOverlay>
+              <AlertDialogContent>
+                <AlertDialogBody>{dialogMessage}</AlertDialogBody>
+                <AlertDialogFooter>
+                  <IconButton
+                    ref={cancelRef}
+                    onClick={closeAlertIfOpen}
+                    colorScheme="teal"
+                    children={<CloseIcon />}
+                  />
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialogOverlay>
+          </AlertDialog>
           <VStack spacing={12} align="stretch">
             <Flex
               flexDirection="row"
@@ -150,6 +208,16 @@ function App() {
                     : "Connect Metamask"}
                 </Button>
               </Box>
+              <Spacer />
+              <Button
+                colorScheme="teal"
+                size="sm"
+                variant="ghost"
+                isLoading={mintLoading}
+                onClick={getSimUSD}
+              >
+                Get SimUSD
+              </Button>
               <Spacer />
               <Link href="https://faucet.rinkeby.io" colorScheme="teal">
                 Request ETH
@@ -221,18 +289,10 @@ function App() {
                     />
                   </InputGroup>
                 </Center>
-                <Center p="4">
+                <Center p="7">
                   <Stat>
-                    <StatLabel>
-                      Price ({toTokenName}/{fromTokenName}):
-                    </StatLabel>
+                    <StatLabel>Price (SimUSD/SimETH):</StatLabel>
                     <StatNumber fontSize="sm">{rawPrice}</StatNumber>
-                  </Stat>
-                </Center>
-                <Center p="4">
-                  <Stat>
-                    <StatLabel>You get ({toTokenName}):</StatLabel>
-                    <StatNumber fontSize="sm">{exchangePrice}</StatNumber>
                   </Stat>
                 </Center>
                 <Center p="5">
@@ -244,6 +304,55 @@ function App() {
                     onClick={swap}
                   >
                     Swap
+                  </Button>
+                </Center>
+              </Box>
+            </Center>
+            <Center>
+              <Box
+                p="10"
+                maxW="sm"
+                borderWidth="1px"
+                borderRadius="lg"
+                overflow="hidden"
+                boxShadow="lg"
+                bg="whiteAlpha.50"
+              >
+                <Heading as="h5" size="sm" p="6">
+                  Convert ETH to SimETH
+                </Heading>
+                <Center>
+                  <InputGroup size="md">
+                    <NumberInput
+                      defaultValue={0.0}
+                      max={eth_balance}
+                      value={eth2SimEth}
+                    >
+                      <NumberInputField
+                        color="teal"
+                        backgroundColor="white"
+                        opacity={0.5}
+                        onChange={handleEthInputChange}
+                      />
+                    </NumberInput>
+                    <InputRightAddon
+                      children={
+                        <Button size="xs" onClick={setMaxETHToSimETH}>
+                          Max
+                        </Button>
+                      }
+                    />
+                  </InputGroup>
+                </Center>
+                <Center p="3">
+                  <Button
+                    rightIcon={<ArrowForwardIcon />}
+                    colorScheme="pink"
+                    size="lg"
+                    color="white"
+                    onClick={exchangeETHForSimETH}
+                  >
+                    Convert
                   </Button>
                 </Center>
               </Box>

@@ -13,7 +13,9 @@ import {
   TokenABI,
   USDAddress,
   SwapABI,
-  SwapAddress
+  SwapAddress,
+  FaucetABI,
+  FaucetAddress
 } from "../constants";
 
 import { Web3Reducer } from "./reducer";
@@ -25,7 +27,8 @@ const initialState = {
   price: null,
   eth_balance: 0,
   sim_eth_balance: 0,
-  sim_usd_balance: 0
+  sim_usd_balance: 0,
+  web3_connected: false
 };
 
 const providerOptions = {};
@@ -38,7 +41,7 @@ export const Web3Context = createContext(initialState);
 
 export const Web3Provider = ({ children }) => {
   const [state, dispatch] = useReducer(Web3Reducer, initialState);
-  const [ethForSimEth, setEthForSimEth] = useState("0");
+  const [ethForSimEth, setEthForSimEth] = useState(0);
 
   const setAccount = account => {
     dispatch({
@@ -82,6 +85,13 @@ export const Web3Provider = ({ children }) => {
     });
   };
 
+  const setWeb3Connected = connected => {
+    dispatch({
+      type: "SET_WEB3_CONNECTED",
+      payload: connected
+    });
+  };
+
   const handleEthInputChange = e => setEthForSimEth(e.target.value);
 
   const fetchPrice = () =>
@@ -104,26 +114,33 @@ export const Web3Provider = ({ children }) => {
     const tx = {
       to: DepositorAddress,
       from: state.account,
-      value: ethers.utils.parseEther(ethForSimEth)
+      value: ethers.utils.parseEther(ethForSimEth.toString())
     };
     const signer = window.web3.getSigner();
     signer.sendTransaction(tx).then(console.log);
   };
 
   const getRawPrice = async (from, to) => {
-    if (window.web3.getSigner) {
-      const swapContract = new ethers.Contract(
-        SwapAddress,
-        SwapABI,
-        window.web3.getSigner()
-      );
-      const pairHash = ethers.utils.solidityKeccak256(
-        ["address", "address"],
-        [from, to]
-      );
-      console.log(pairHash);
-      return Promise.resolve(swapContract.getRawPrice(pairHash));
-    }
+    const swapContract = new ethers.Contract(
+      SwapAddress,
+      SwapABI,
+      window.web3.getSigner()
+    );
+    const pairHash = ethers.utils.solidityKeccak256(
+      ["address", "address"],
+      [from, to]
+    );
+    console.log(pairHash);
+    return Promise.resolve(swapContract.getRawPrice(pairHash));
+  };
+
+  const mintSimUSD = () => {
+    const faucetContract = new ethers.Contract(
+      FaucetAddress,
+      FaucetABI,
+      state.provider.getSigner()
+    );
+    return Promise.resolve(faucetContract.mint());
   };
 
   const swapTokens = async (from, to, amount, minAmountOut) => {
@@ -178,6 +195,7 @@ export const Web3Provider = ({ children }) => {
     setSimUSDBalance(
       parseFloat((parseInt(simUSDBalance.toString()) / 10 ** 18).toFixed(4))
     );
+    setWeb3Connected(true);
 
     provider.on("chainChanged", () => {
       window.location.reload();
@@ -202,7 +220,8 @@ export const Web3Provider = ({ children }) => {
         handleEthInputChange,
         ethForSimEth,
         swapTokens,
-        getRawPrice
+        getRawPrice,
+        mintSimUSD
       }}
     >
       {children}

@@ -30,6 +30,11 @@ export const Web3Reducer = (state, action) => {
         ...state,
         sim_usd_balance: action.payload
       };
+    case "SET_WEB3_CONNECTED":
+      return {
+        ...state,
+        web3_connected: action.payload
+      };
     default:
       return state;
   }
