@@ -349,6 +349,7 @@ function App() {
                     size="lg"
                     color="white"
                     onClick={swap}
+                    disabled={fromValue > fromTokenBalance}
                   >
                     Swap
                   </Button>
@@ -403,6 +404,7 @@ function App() {
                     size="lg"
                     color="white"
                     onClick={getSimETHFromETH}
+                    disabled={eth2SimEth > eth_balance}
                   >
                     Convert
                   </Button>
