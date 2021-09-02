@@ -110,14 +110,15 @@ export const Web3Provider = ({ children }) => {
     localStorage.setItem("defaultWallet", null);
   };
 
-  const exchangeETHForSimETH = () => {
+  const exchangeETHForSimETH = async () => {
     const tx = {
       to: DepositorAddress,
       from: state.account,
       value: ethers.utils.parseEther(ethForSimEth.toString())
     };
     const signer = window.web3.getSigner();
-    signer.sendTransaction(tx).then(console.log);
+    const tX = await signer.sendTransaction(tx);
+    await tX.wait();
   };
 
   const getRawPrice = async (from, to) => {
@@ -158,17 +159,18 @@ export const Web3Provider = ({ children }) => {
     const allowance = await tokenContract.allowance(state.account, SwapAddress);
 
     if (allowance === 0) {
-      await tokenContract.approve(SwapAddress, balance);
+      const approvalTx = await tokenContract.approve(SwapAddress, balance);
+      await approvalTx.wait();
     }
 
-    swapContract
-      .swap(
-        from,
-        to,
-        ethers.utils.parseEther(amount.toString()),
-        ethers.utils.parseEther(minAmountOut.toString())
-      )
-      .then(console.log);
+    const swapTx = await swapContract.swap(
+      from,
+      to,
+      ethers.utils.parseEther(amount.toString()),
+      ethers.utils.parseEther(minAmountOut.toString())
+    );
+
+    await swapTx.wait();
   };
 
   const connectWeb3 = useCallback(async () => {

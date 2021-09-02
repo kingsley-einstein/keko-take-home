@@ -24,7 +24,8 @@ import {
   AlertDialogBody,
   AlertDialogOverlay,
   AlertDialogContent,
-  AlertDialogFooter
+  AlertDialogFooter,
+  Spinner
 } from "@chakra-ui/react";
 import { ArrowUpDownIcon, ArrowForwardIcon, CloseIcon } from "@chakra-ui/icons";
 import { USDAddress, ETHAddress } from "./constants";
@@ -61,6 +62,8 @@ function App() {
   const [rawPrice, setRawPrice] = useState(0);
   const [eth2SimEth, setEth2SimEth] = useState(ethForSimEth);
   const [mintLoading, setMintLoading] = useState(false);
+  const [swapLoading, setSwapLoading] = useState(false);
+  const [convertLoading, setConvertLoading] = useState(false);
   const [alertColorScheme, setAlertColorScheme] = useState("green");
   const [dialogShown, setDialogShown] = useState(false);
   const [dialogMessage, setDialogMessage] = useState("");
@@ -111,7 +114,19 @@ function App() {
   };
 
   const swap = async () => {
-    await swapTokens(fromAddress, toAddress, fromValue, toValue);
+    try {
+      setSwapLoading(true);
+      await swapTokens(fromAddress, toAddress, fromValue, toValue);
+      setSwapLoading(false);
+      setDialogMessage("Successfully swapped");
+      setAlertColorScheme("green");
+      setDialogShown(true);
+    } catch (error) {
+      setSwapLoading(false);
+      setDialogMessage(error.message);
+      setAlertColorScheme("red");
+      setDialogShown(true);
+    }
   };
 
   const getSimUSD = async () => {
@@ -127,6 +142,22 @@ function App() {
       setAlertColorScheme("red");
       setDialogShown(true);
       setMintLoading(false);
+    }
+  };
+
+  const getSimETHFromETH = async () => {
+    try {
+      setConvertLoading(true);
+      await exchangeETHForSimETH();
+      setDialogMessage("Successfully exchanged ETH for SimETH");
+      setAlertColorScheme("green");
+      setDialogShown(true);
+      setConvertLoading(false);
+    } catch (error) {
+      setDialogMessage(error.message);
+      setAlertColorScheme("red");
+      setDialogShown(true);
+      setConvertLoading(false);
     }
   };
 
@@ -150,11 +181,15 @@ function App() {
     setTimeout(() => {
       if (web3_connected) {
         getRawPrice(ETHAddress, USDAddress).then(p =>
-          setRawPrice(parseInt(p.toString()) / 10 ** 18)
+          setRawPrice(parseInt(p.toString()) / 10 ** 8)
         );
       }
     }, 500);
   }, [web3_connected]);
+
+  useEffect(() => {
+    setEth2SimEth(ethForSimEth);
+  }, [ethForSimEth]);
 
   return (
     <div>
@@ -200,7 +235,14 @@ function App() {
                 <Button colorScheme="transparent" opacity="0.5" size="sm">
                   {sim_usd_balance} SimUSD
                 </Button>
-                <Button colorScheme="teal" onClick={connectWeb3} size="sm">
+                <Button
+                  colorScheme="teal"
+                  onClick={() => {
+                    if (!account) connectWeb3();
+                    else logout();
+                  }}
+                  size="sm"
+                >
                   {account
                     ? account.substring(0, account.length - 36) +
                       "..." +
@@ -295,6 +337,11 @@ function App() {
                     <StatNumber fontSize="sm">{rawPrice}</StatNumber>
                   </Stat>
                 </Center>
+                {swapLoading && (
+                  <Center p="2">
+                    <Spinner color="blue" />
+                  </Center>
+                )}
                 <Center p="5">
                   <Button
                     rightIcon={<ArrowForwardIcon />}
@@ -344,13 +391,18 @@ function App() {
                     />
                   </InputGroup>
                 </Center>
+                {convertLoading && (
+                  <Center p="2">
+                    <Spinner color="blue" />
+                  </Center>
+                )}
                 <Center p="3">
                   <Button
                     rightIcon={<ArrowForwardIcon />}
                     colorScheme="pink"
                     size="lg"
                     color="white"
-                    onClick={exchangeETHForSimETH}
+                    onClick={getSimETHFromETH}
                   >
                     Convert
                   </Button>
